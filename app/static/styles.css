@@ -82,6 +82,18 @@ body, html {
     margin-left: 10px;
 }
 
+.screenshot-button {
+    margin-left: 10px;
+    padding: 5px 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+.screenshot-button:hover {
+    background-color: #45a049;
+}
+
 /* 中間樣式 */
 .middle-panel {
     flex: 2;

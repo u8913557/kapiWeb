@@ -32,7 +32,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 const li = document.createElement('li');
                 li.textContent = filename;
                 li.dataset.filename = filename; // 儲存檔案名稱以便後續使用
-
+    
+                // 新增「截圖」按鈕
+                const screenshotButton = document.createElement('button');
+                screenshotButton.textContent = '截圖';
+                screenshotButton.className = 'screenshot-button';
+                screenshotButton.addEventListener('click', () => {
+                    const filename = li.dataset.filename;
+                    const filePath = `/uploads/${filename}`; // 假設檔案存儲在 /uploads 目錄下
+    
+                    // 顯示截圖
+                    const screenshotImg = document.getElementById('screenshot-img');
+                    if (screenshotImg) {
+                        const fileExtension = filename.split('.').pop().toLowerCase();
+                        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp'];
+    
+                        if (imageExtensions.includes(fileExtension)) {
+                            // 如果是圖片檔案，直接顯示
+                            screenshotImg.src = filePath;
+                            screenshotImg.style.display = 'block';
+                        } else {
+                            // 如果是非圖片檔案，顯示預設預覽圖片
+                            screenshotImg.src = '/static/default-preview.png';
+                            screenshotImg.style.display = 'block';
+                        }
+                    }
+                });
+    
                 // 移除按鈕
                 const removeButton = document.createElement('button');
                 removeButton.textContent = '移除';
@@ -73,15 +99,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     processedTag.style.color = 'green';
                     li.appendChild(processedTag);
                 });
-
-                // 初始時顯示兩個按鈕
+    
+                // 將所有按鈕添加到 li 元素中
+                li.appendChild(screenshotButton); // 新增的截圖按鈕
+                li.appendChild(removeButton);
                 if (!li.classList.contains('rag-processed')) {
                     li.appendChild(removeButton);
                     li.appendChild(ragButton);
                 } else {
                     li.appendChild(removeButton); // 已 RAG 處理的檔案只顯示移除按鈕
                 }
-
+    
                 fileList.appendChild(li);
             } catch (error) {
                 console.error('Error uploading file:', error);
