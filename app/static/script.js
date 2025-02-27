@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const fileUpload = document.getElementById('file-upload');
     const fileList = document.getElementById('file-list');
-    const screenshotImg = document.getElementById('screenshot-img');
+    const screenshotContainer = document.getElementById('screenshot-container');
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
     const chatHistory = document.getElementById('chat-history');
@@ -35,19 +35,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const screenshotButton = document.createElement('button');
         screenshotButton.textContent = '截圖';
         screenshotButton.className = 'screenshot-button';
-        screenshotButton.addEventListener('click', () => {
-            const filePath = `/uploads/${filename}`;
-            const screenshotImg = document.getElementById('screenshot-img');
-            if (screenshotImg) {
-                const fileExtension = filename.split('.').pop().toLowerCase();
-                const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp'];
-                if (imageExtensions.includes(fileExtension)) {
-                    screenshotImg.src = filePath;
-                    screenshotImg.style.display = 'block';
-                } else {
-                    screenshotImg.src = '/static/default-preview.png';
-                    screenshotImg.style.display = 'block';
+        screenshotButton.addEventListener('click', async () => {
+            console.log('截圖按鈕被點擊，檔案:', filename);
+            const fileExtension = filename.split('.').pop().toLowerCase();
+            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp'];
+            const screenshotFilename = document.getElementById('screenshot-filename');
+        
+            // 清空中間區域並更新檔案名稱
+            screenshotContainer.innerHTML = '';
+            screenshotFilename.textContent = filename; // 顯示檔案名稱
+        
+            if (imageExtensions.includes(fileExtension)) {
+                const img = document.createElement('img');
+                img.src = `/uploads/${filename}`;
+                img.alt = filename;
+                img.style.display = 'block';
+                screenshotContainer.appendChild(img);
+            } else if (fileExtension === 'pdf') {
+                const formData = new FormData();
+                formData.append('file_path', filename);
+                try {
+                    const response = await fetch('/screenshot', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!response.ok) throw new Error('截圖生成失敗');
+                    const data = await response.json();
+                    data.thumbnails.forEach(thumb => {
+                        const img = document.createElement('img');
+                        img.src = thumb;
+                        img.alt = `Page of ${filename}`;
+                        img.style.display = 'block';
+                        screenshotContainer.appendChild(img);
+                    });
+                } catch (error) {
+                    console.error('截圖錯誤:', error);
+                    const img = document.createElement('img');
+                    img.src = '/static/default-preview.png';
+                    screenshotContainer.appendChild(img);
                 }
+            } else {
+                const img = document.createElement('img');
+                img.src = '/static/default-preview.png';
+                screenshotContainer.appendChild(img);
             }
         });
 

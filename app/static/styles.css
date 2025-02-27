@@ -8,7 +8,7 @@ body, html {
 /* 主容器使用 Flexbox 實現三欄佈局 */
 .main-container {
     display: flex;
-    height: 100%;
+    height: 100vh;
 }
 
 .left-panel, .middle-panel, .right-panel {
@@ -94,19 +94,46 @@ body, html {
     background-color: #45a049;
 }
 
-/* 中間樣式 */
+/* 中間區域樣式 */
 .middle-panel {
     flex: 2;
     background-color: #ffffff;
+    padding: 20px;
+    height: 100%;
     display: flex;
-    justify-content: center;
-    align-items: center;
+    flex-direction: column;
 }
 
-.screenshot img {
-    max-width: 100%;
-    max-height: 100%;
-    display: none; /* 初始隱藏截圖 */
+/* 截圖容器樣式 */
+.screenshot-container {
+    width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-grow: 1; /* 讓容器佔據剩餘空間 */
+}
+
+/* 截圖圖片樣式 */
+.screenshot-container img {
+    width: 100%;
+    max-width: 800px;
+    max-height: 800px;
+    object-fit: contain;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+}
+
+/* 檔案名稱區域樣式 */
+.screenshot-filename {
+    height: 40px; /* 固定高度，可根據需求調整 */
+    line-height: 40px; /* 文字垂直居中 */
+    text-align: center;
+    background-color: #f0f0f0;
+    border-top: 1px solid #ccc;
+    font-size: 16px;
+    color: #333;
 }
 
 /* 右側樣式 */

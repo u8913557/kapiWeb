@@ -19,8 +19,12 @@ UPLOAD_FOLDER = os.path.join(app_dir, 'uploads')
 OUTPUT_FOLDER = os.path.join(app_dir, 'output')
 
 # 确保文件夹存在
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
+app.mount("/output", StaticFiles(directory=OUTPUT_FOLDER), name="output")
 
 from utils.llm_utils import create_plain_llm
 
@@ -52,7 +56,6 @@ async def submit_chat(request: Request):
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     # 將檔案保存到 UPLOAD_FOLDER
-    print("將檔案保存到 UPLOAD_FOLDER")
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     with open(file_path, "wb") as f:
         f.write(await file.read())
@@ -61,7 +64,6 @@ async def upload_file(file: UploadFile = File(...)):
 # 文件移除路由
 @app.post("/remove")
 async def remove_file(request: Request):
-    print("從UPLOAD_FOLDER移除檔案")
     form_data = await request.form()
     filename = form_data.get('filename')
     file_path = os.path.join(UPLOAD_FOLDER, filename)
@@ -78,6 +80,27 @@ async def get_uploaded_files():
         return JSONResponse(content={"files": files})
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+from utils.ocr_utils import generate_pdf_thumbnails
+
+# 截圖處理路由
+@app.post("/screenshot")
+async def screenshot_files(request: Request):
+    form_data = await request.form()
+    filename = form_data.get('file_path')
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    print(f"處理檔案: {file_path}")
+    
+    if not os.path.exists(file_path):
+        return JSONResponse(content={"error": "檔案不存在"}, status_code=404)
+    
+    if file_path.lower().endswith('.pdf'):
+        thumbnail_paths = generate_pdf_thumbnails(file_path, OUTPUT_FOLDER)
+        print(f"返回縮圖: {thumbnail_paths}")
+        return JSONResponse(content={"thumbnails": thumbnail_paths})
+    else:
+        return JSONResponse(content={"thumbnails": [f"/uploads/{filename}"]})
+
 
 # LINE-BOT路由
 
