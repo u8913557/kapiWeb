@@ -1,0 +1,149 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: Arial, sans-serif;
+}
+
+/* 主容器使用 Flexbox 實現三欄佈局 */
+.main-container {
+    display: flex;
+    height: 100%;
+}
+
+.left-panel, .middle-panel, .right-panel {
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* 左側樣式 */
+.left-panel {
+    flex: 1;
+    background-color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+}
+
+.upload-section {
+    margin-bottom: 20px;
+}
+
+.upload-button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    display: inline-block;
+}
+
+#file-upload {
+    display: none; /* 隱藏原始檔案輸入框 */
+}
+
+.file-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.file-list ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.file-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    cursor: pointer;
+}
+
+.remove-button {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+/* 中間樣式 */
+.middle-panel {
+    flex: 2;
+    background-color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.screenshot img {
+    max-width: 100%;
+    max-height: 100%;
+    display: none; /* 初始隱藏截圖 */
+}
+
+/* 右側樣式 */
+.right-panel {
+    flex: 1;
+    background-color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* 將歷史訊息和輸入區分隔開 */
+}
+
+/* 對話歷史容器樣式 */
+.chat-history {
+    flex: 1; /* 佔據剩餘空間 */
+    display: flex;
+    flex-direction: column-reverse; /* 訊息從下往上顯示 */
+    overflow-y: auto; /* 支援滾動 */
+    padding: 10px;
+}
+
+.user-message, .system-message {
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 80%;
+}
+
+/* 使用者訊息樣式（靠右） */
+.user-message {
+    align-self: flex-end; /* 使用者訊息靠右 */
+    background-color: #007bff;
+    color: white;
+}
+
+/* 系統訊息樣式（靠左） */
+.system-message {
+    align-self: flex-start; /* 系統訊息靠左 */
+    background-color: #e9e9e9;
+    color: black;
+}
+
+/* 輸入框和按鈕的美化樣式 */
+.chat-input {
+    display: flex;
+    padding: 10px;
+    background-color: #fff;
+    border-top: 1px solid #ccc; /* 與歷史訊息區分隔線 */
+}
+
+.chat-input input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    margin-right: 10px;
+}
+
+.chat-input button {
+    padding: 10px 20px;
+    border: none;
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    border-radius: 20px;
+}
