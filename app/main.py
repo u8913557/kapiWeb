@@ -1,6 +1,6 @@
 # main.py
 import os
-from fastapi import FastAPI, Request, Header, HTTPException
+from fastapi import FastAPI, File, UploadFile, Request, Header, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -48,6 +48,29 @@ async def submit_chat(request: Request):
 
     return JSONResponse(content={"result": f"AI回答:\n{response}"})
 
+# 文件上傳路由
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    # 將檔案保存到 UPLOAD_FOLDER
+    print("將檔案保存到 UPLOAD_FOLDER")
+    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+    return JSONResponse(content={"message": "File uploaded successfully", "filename": file.filename})
+
+# 文件移除路由
+@app.post("/remove")
+async def remove_file(request: Request):
+    print("從UPLOAD_FOLDER移除檔案")
+    form_data = await request.form()
+    filename = form_data.get('filename')
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        return JSONResponse(content={"message": "File removed successfully"})
+    else:
+        return JSONResponse(content={"message": "File not found"}, status_code=404)
+
 # LINE-BOT路由
 
 from utils.line_bot_handler import handle_line_ask_message, handle_line_assistant_message
@@ -87,6 +110,7 @@ async def call_assistant(request: Request, x_line_signature: str = Header(None))
         raise HTTPException(status_code=500, detail="Internal server error")
 
     return "OK"
+
 
 if __name__ == "__main__":
     import uvicorn

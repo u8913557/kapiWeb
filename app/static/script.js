@@ -8,32 +8,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // 處理檔案上傳
-    fileUpload.addEventListener('change', (event) => {
+    fileUpload.addEventListener('change', async (event) => {
         const files = event.target.files;
-        Array.from(files).forEach(file => {
-            const li = document.createElement('li');
-            li.textContent = file.name;
-            const removeButton = document.createElement('button');
-            removeButton.textContent = '移除';
-            removeButton.className = 'remove-button';
-            removeButton.addEventListener('click', () => {
-                fileList.removeChild(li);
-            });
-            li.appendChild(removeButton);
-            fileList.appendChild(li);
+        for (const file of files) {
+            const formData = new FormData();
+            formData.append('file', file);
 
-            // 如果是圖片，顯示截圖
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    screenshotImg.src = e.target.result;
-                    screenshotImg.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
+            try {
+                // 發送上傳請求到後端
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                const data = await response.json();
+                const filename = data.filename;
+
+                // 動態生成檔案名稱和操作按鈕
+                const li = document.createElement('li');
+                li.textContent = filename;
+                li.dataset.filename = filename; // 儲存檔案名稱以便後續使用
+
+                // 移除按鈕
+                const removeButton = document.createElement('button');
+                removeButton.textContent = '移除';
+                removeButton.className = 'remove-button';
+                removeButton.addEventListener('click', async () => {
+                    const filename = li.dataset.filename;
+                    const formData = new FormData();
+                    formData.append('filename', filename);
+
+                    try {
+                        const response = await fetch('/remove', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Remove failed');
+                        }
+
+                        fileList.removeChild(li);
+                    } catch (error) {
+                        console.error('Error removing file:', error);
+                    }
+                });
+
+                // RAG 處理按鈕
+                const ragButton = document.createElement('button');
+                ragButton.textContent = 'RAG 處理';
+                ragButton.className = 'rag-button';
+                ragButton.addEventListener('click', () => {
+                    // 模擬 RAG 處理（待實作）
+                    console.log('RAG 處理:', filename);
+                    // 假設 RAG 處理完成，將檔案標記為已處理
+                    li.classList.add('rag-processed');
+                    li.removeChild(ragButton); // 移除 RAG 按鈕，只保留移除按鈕
+                    const processedTag = document.createElement('span');
+                    processedTag.textContent = ' (已 RAG 處理)';
+                    processedTag.style.color = 'green';
+                    li.appendChild(processedTag);
+                });
+
+                // 初始時顯示兩個按鈕
+                if (!li.classList.contains('rag-processed')) {
+                    li.appendChild(removeButton);
+                    li.appendChild(ragButton);
+                } else {
+                    li.appendChild(removeButton); // 已 RAG 處理的檔案只顯示移除按鈕
+                }
+
+                fileList.appendChild(li);
+            } catch (error) {
+                console.error('Error uploading file:', error);
             }
-        });
+        }
     });
-
+    
     // 添加訊息到對話歷史的函數
     function addMessage(text, sender) {
         const messageDiv = document.createElement('div');

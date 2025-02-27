@@ -67,6 +67,19 @@ body, html {
     padding: 5px 10px;
     cursor: pointer;
     border-radius: 3px;
+    margin-left: 10px;
+}
+
+.rag-processed {
+    color: green; /* 或其他您想要的顏色 */
+}
+
+.remove-button {
+    margin-left: 10px;
+}
+
+.rag-button {
+    margin-left: 10px;
 }
 
 /* 中間樣式 */
