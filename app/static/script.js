@@ -6,6 +6,98 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendButton = document.getElementById('send-button');
     const chatHistory = document.getElementById('chat-history');
 
+    // 提取按鈕生成邏輯為獨立函式
+    function addFileToList(filename) {
+        const li = document.createElement('li');
+        li.textContent = filename;
+        li.dataset.filename = filename; // 儲存檔案名稱以便後續使用
+
+        // 「移除」按鈕
+        const removeButton = document.createElement('button');
+        removeButton.textContent = '移除';
+        removeButton.className = 'remove-button';
+        removeButton.addEventListener('click', async () => {
+            const formData = new FormData();
+            formData.append('filename', filename);
+            try {
+                const response = await fetch('/remove', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!response.ok) throw new Error('Remove failed');
+                fileList.removeChild(li);
+            } catch (error) {
+                console.error('Error removing file:', error);
+            }
+        });
+
+        // 「截圖」按鈕
+        const screenshotButton = document.createElement('button');
+        screenshotButton.textContent = '截圖';
+        screenshotButton.className = 'screenshot-button';
+        screenshotButton.addEventListener('click', () => {
+            const filePath = `/uploads/${filename}`;
+            const screenshotImg = document.getElementById('screenshot-img');
+            if (screenshotImg) {
+                const fileExtension = filename.split('.').pop().toLowerCase();
+                const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp'];
+                if (imageExtensions.includes(fileExtension)) {
+                    screenshotImg.src = filePath;
+                    screenshotImg.style.display = 'block';
+                } else {
+                    screenshotImg.src = '/static/default-preview.png';
+                    screenshotImg.style.display = 'block';
+                }
+            }
+        });
+
+        // 「RAG 處理」按鈕
+        const ragButton = document.createElement('button');
+        ragButton.textContent = 'RAG 處理';
+        ragButton.className = 'rag-button';
+        ragButton.addEventListener('click', () => {
+            console.log('RAG 處理:', filename);
+            li.classList.add('rag-processed');
+            li.removeChild(ragButton);
+            const processedTag = document.createElement('span');
+            processedTag.textContent = ' (已 RAG 處理)';
+            processedTag.style.color = 'green';
+            li.appendChild(processedTag);
+        });
+
+        // 添加按鈕到 li
+        li.appendChild(removeButton);
+        li.appendChild(screenshotButton);
+        if (!li.classList.contains('rag-processed')) {
+            li.appendChild(ragButton);
+        }
+
+        fileList.appendChild(li);
+    }
+
+    // 刷新時載入檔案列表
+    async function loadFileList() {
+        try {
+            const response = await fetch('/files');
+            if (!response.ok) throw new Error('無法獲取檔案列表');
+            const data = await response.json();
+            const files = data.files;
+
+            // 清空現有列表
+            fileList.innerHTML = '';
+
+            // 動態生成檔案列表並添加按鈕
+            files.forEach(filename => {
+                addFileToList(filename); // 使用統一的函式添加檔案
+            });
+        } catch (error) {
+            console.error('獲取檔案列表時出錯:', error);
+        }
+    }
+
+    // 調用刷新函式
+    loadFileList();
+
 
     // 處理檔案上傳
     fileUpload.addEventListener('change', async (event) => {
@@ -27,90 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await response.json();
                 const filename = data.filename;
-
-                // 動態生成檔案名稱和操作按鈕
-                const li = document.createElement('li');
-                li.textContent = filename;
-                li.dataset.filename = filename; // 儲存檔案名稱以便後續使用
-    
-                // 新增「截圖」按鈕
-                const screenshotButton = document.createElement('button');
-                screenshotButton.textContent = '截圖';
-                screenshotButton.className = 'screenshot-button';
-                screenshotButton.addEventListener('click', () => {
-                    const filename = li.dataset.filename;
-                    const filePath = `/uploads/${filename}`; // 假設檔案存儲在 /uploads 目錄下
-    
-                    // 顯示截圖
-                    const screenshotImg = document.getElementById('screenshot-img');
-                    if (screenshotImg) {
-                        const fileExtension = filename.split('.').pop().toLowerCase();
-                        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp'];
-    
-                        if (imageExtensions.includes(fileExtension)) {
-                            // 如果是圖片檔案，直接顯示
-                            screenshotImg.src = filePath;
-                            screenshotImg.style.display = 'block';
-                        } else {
-                            // 如果是非圖片檔案，顯示預設預覽圖片
-                            screenshotImg.src = '/static/default-preview.png';
-                            screenshotImg.style.display = 'block';
-                        }
-                    }
-                });
-    
-                // 移除按鈕
-                const removeButton = document.createElement('button');
-                removeButton.textContent = '移除';
-                removeButton.className = 'remove-button';
-                removeButton.addEventListener('click', async () => {
-                    const filename = li.dataset.filename;
-                    const formData = new FormData();
-                    formData.append('filename', filename);
-
-                    try {
-                        const response = await fetch('/remove', {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        if (!response.ok) {
-                            throw new Error('Remove failed');
-                        }
-
-                        fileList.removeChild(li);
-                    } catch (error) {
-                        console.error('Error removing file:', error);
-                    }
-                });
-
-                // RAG 處理按鈕
-                const ragButton = document.createElement('button');
-                ragButton.textContent = 'RAG 處理';
-                ragButton.className = 'rag-button';
-                ragButton.addEventListener('click', () => {
-                    // 模擬 RAG 處理（待實作）
-                    console.log('RAG 處理:', filename);
-                    // 假設 RAG 處理完成，將檔案標記為已處理
-                    li.classList.add('rag-processed');
-                    li.removeChild(ragButton); // 移除 RAG 按鈕，只保留移除按鈕
-                    const processedTag = document.createElement('span');
-                    processedTag.textContent = ' (已 RAG 處理)';
-                    processedTag.style.color = 'green';
-                    li.appendChild(processedTag);
-                });
-    
-                // 將所有按鈕添加到 li 元素中
-                li.appendChild(screenshotButton); // 新增的截圖按鈕
-                li.appendChild(removeButton);
-                if (!li.classList.contains('rag-processed')) {
-                    li.appendChild(removeButton);
-                    li.appendChild(ragButton);
-                } else {
-                    li.appendChild(removeButton); // 已 RAG 處理的檔案只顯示移除按鈕
-                }
-    
-                fileList.appendChild(li);
+                addFileToList(filename);
+                
             } catch (error) {
                 console.error('Error uploading file:', error);
             }

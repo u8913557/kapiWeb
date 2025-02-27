@@ -70,6 +70,14 @@ async def remove_file(request: Request):
         return JSONResponse(content={"message": "File removed successfully"})
     else:
         return JSONResponse(content={"message": "File not found"}, status_code=404)
+    
+@app.get("/files")
+async def get_uploaded_files():
+    try:
+        files = os.listdir(UPLOAD_FOLDER)  # 讀取 UPLOAD_FOLDER 中的檔案列表
+        return JSONResponse(content={"files": files})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 # LINE-BOT路由
 
