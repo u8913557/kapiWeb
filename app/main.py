@@ -1,5 +1,6 @@
+# main.py
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -35,6 +36,46 @@ def get_llm_chain():
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+# LINE-BOT路由
+
+from utils.line_bot_handler import handle_line_ask_message, handle_line_assistant_message
+
+@app.post("/ask")
+async def call_ask(request: Request, x_line_signature: str = Header(None)):
+    signature = x_line_signature
+    body = await request.body()
+    body_str = body.decode('utf-8')
+    print("Request body:", body_str)
+
+    try:
+        llm_chain = get_llm_chain()
+        handle_line_ask_message(body_str, signature, llm_chain)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error handling Line message: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    return "OK"
+
+@app.post("/assistant")
+async def call_assistant(request: Request, x_line_signature: str = Header(None)):
+    signature = x_line_signature
+    body = await request.body()
+    body_str = body.decode('utf-8')
+    print("Request body:", body_str)
+
+    try:
+        llm_chain = get_llm_chain()
+        handle_line_assistant_message(body_str, signature, llm_chain)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error handling Line assistant message: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    return "OK"
 
 if __name__ == "__main__":
     import uvicorn
