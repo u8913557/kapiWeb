@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清爽網頁設計</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="main-container">
+        <!-- 左側區域 -->
+        <div class="left-panel">
+            <div class="upload-section">
+                <input type="file" id="file-upload" multiple>
+                <label for="file-upload" class="upload-button">上傳檔案</label>
+            </div>
+            <div class="file-list">
+                <h3>已上傳檔案</h3>
+                <ul id="file-list">
+                    <!-- 檔案列表將動態生成 -->
+                </ul>
+            </div>
+        </div>
+        <!-- 中間區域 -->
+        <div class="middle-panel">
+            <div class="screenshot">
+                <img id="screenshot-img" src="" alt="檔案截圖">
+            </div>
+        </div>
+        <!-- 右側區域 -->
+        <div class="right-panel">
+            <div class="chat-history" id="chat-history">
+                <!-- 歷史訊息將動態添加在此 -->
+            </div>
+            <div class="chat-input">
+                <input type="text" id="chat-input" placeholder="輸入訊息...">
+                <button id="send-button">發送</button>
+            </div>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>
