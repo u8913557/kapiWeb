@@ -118,8 +118,3 @@ async def call_assistant(request: Request, x_line_signature: str = Header(None))
         raise HTTPException(status_code=500, detail="Internal server error")
 
     return "OK"
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
