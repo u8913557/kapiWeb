@@ -43,15 +43,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 發送按鈕的事件監聽器
-    sendButton.addEventListener('click', () => {
+    sendButton.addEventListener('click', async () => {
         const message = chatInput.value.trim();
         if (message) {
+            // 1. 將用戶的訊息添加到聊天歷史中
             addMessage(message, 'user');
             chatInput.value = ''; // 清空輸入框
-            // 模擬系統回應
-            setTimeout(() => {
-                addMessage('系統回應', 'system');
-            }, 1000);
+
+            // 2. 將訊息發送到後端並接收回應
+            try {
+                const formData = new FormData();
+                formData.append('text', message);
+
+                const response = await fetch('/chat-submit', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('後端回應異常');
+                }
+
+                const data = await response.json();
+
+                // 3. 將後端的回應添加到聊天歷史中
+                addMessage(data.result, 'system');
+            } catch (error) {
+                console.error('錯誤:', error);
+                addMessage('系統錯誤，請稍後再試。', 'system');
+            }
         }
     });
 });

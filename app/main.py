@@ -1,7 +1,7 @@
 # main.py
 import os
 from fastapi import FastAPI, Request, Header, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -37,6 +37,16 @@ def get_llm_chain():
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+@app.post("/chat-submit")
+async def submit_chat(request: Request):
+    form_data = await request.form()
+    text = form_data.get('text')
+
+    llm_chain = get_llm_chain()
+    response = llm_chain.invoke(text)
+
+    return JSONResponse(content={"result": f"AI回答:\n{response}"})
 
 # LINE-BOT路由
 
