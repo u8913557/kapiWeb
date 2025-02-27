@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+# 初始化 FastAPI 应用
 app = FastAPI()
 
 # 配置模板和静态文件
