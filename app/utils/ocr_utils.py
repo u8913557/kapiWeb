@@ -46,6 +46,18 @@ def extract_text_from_file(file_location, output_folder):
     print(f"Extracted text from file using OCR.")
     return all_text
 
+def get_existing_thumbnails(filename, output_folder):
+    base_filename = os.path.splitext(filename)[0]
+    existing_paths = []
+    i = 1
+    while True:
+        output_path = os.path.join(output_folder, f"{base_filename}_page_{i}.png")
+        if os.path.exists(output_path):
+            existing_paths.append(f"/output/{base_filename}_page_{i}.png")
+            i += 1
+        else:
+            break
+    return existing_paths
 
 def generate_pdf_thumbnails(file_path, output_folder, dpi=300):
     """將 PDF 文件每頁製作成縮圖。
@@ -165,4 +177,4 @@ def docling_extract_text_from_file(file_location, output_folder):
 
     except Exception as e:
         logging.error(f"處理檔案 {file_location} 時發生錯誤：{e}")
-        return f"Error: {e}" # 回傳錯誤訊息給前
+        return f"Error: {e}" # 回傳錯誤訊息給前台

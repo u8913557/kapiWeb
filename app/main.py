@@ -61,17 +61,28 @@ async def upload_file(file: UploadFile = File(...)):
         f.write(await file.read())
     return JSONResponse(content={"message": "File uploaded successfully", "filename": file.filename})
 
-# 文件移除路由
+# 移除檔案路由
 @app.post("/remove")
 async def remove_file(request: Request):
     form_data = await request.form()
     filename = form_data.get('filename')
     file_path = os.path.join(UPLOAD_FOLDER, filename)
+    
     if os.path.exists(file_path):
         os.remove(file_path)
-        return JSONResponse(content={"message": "File removed successfully"})
-    else:
-        return JSONResponse(content={"message": "File not found"}, status_code=404)
+    
+    # 檢查並刪除相關截圖
+    base_filename = os.path.splitext(filename)[0]
+    i = 1
+    while True:
+        screenshot_path = os.path.join(OUTPUT_FOLDER, f"{base_filename}_page_{i}.png")
+        if os.path.exists(screenshot_path):
+            os.remove(screenshot_path)
+            i += 1
+        else:
+            break
+    
+    return JSONResponse(content={"message": "檔案及其截圖已移除"})
     
 @app.get("/files")
 async def get_uploaded_files():
@@ -81,7 +92,7 @@ async def get_uploaded_files():
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
-from utils.ocr_utils import generate_pdf_thumbnails
+from utils.ocr_utils import generate_pdf_thumbnails, get_existing_thumbnails
 
 # 截圖處理路由
 @app.post("/screenshot")
@@ -89,14 +100,17 @@ async def screenshot_files(request: Request):
     form_data = await request.form()
     filename = form_data.get('file_path')
     file_path = os.path.join(UPLOAD_FOLDER, filename)
-    print(f"處理檔案: {file_path}")
     
     if not os.path.exists(file_path):
         return JSONResponse(content={"error": "檔案不存在"}, status_code=404)
     
     if file_path.lower().endswith('.pdf'):
+        # 檢查是否已有截圖
+        existing_thumbnails = get_existing_thumbnails(filename, OUTPUT_FOLDER)
+        if existing_thumbnails:
+            return JSONResponse(content={"thumbnails": existing_thumbnails})
+        # 若無現有截圖，生成新截圖
         thumbnail_paths = generate_pdf_thumbnails(file_path, OUTPUT_FOLDER)
-        print(f"返回縮圖: {thumbnail_paths}")
         return JSONResponse(content={"thumbnails": thumbnail_paths})
     else:
         return JSONResponse(content={"thumbnails": [f"/uploads/{filename}"]})

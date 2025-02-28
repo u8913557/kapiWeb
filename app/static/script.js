@@ -1,3 +1,6 @@
+
+console.log('script.js 開始執行');
+
 document.addEventListener('DOMContentLoaded', () => {
     const fileUpload = document.getElementById('file-upload');
     const fileList = document.getElementById('file-list');
@@ -17,17 +20,33 @@ document.addEventListener('DOMContentLoaded', () => {
         removeButton.textContent = '移除';
         removeButton.className = 'remove-button';
         removeButton.addEventListener('click', async () => {
+            console.log('刪除按鈕被點擊，檔案:', filename);
+            const screenshotContainer = document.getElementById('screenshot-container');
+            const screenshotFilename = document.getElementById('screenshot-filename');
             const formData = new FormData();
             formData.append('filename', filename);
+
+            if (!screenshotContainer || !screenshotFilename) {
+                console.error('截圖區域元素未找到:', { screenshotContainer, screenshotFilename });
+                return;
+            }
+
+            console.log('當前顯示檔案:', screenshotFilename.textContent);
+            if (screenshotFilename.textContent === filename) {
+                console.log('檔案匹配，清空中間區域');
+                screenshotContainer.innerHTML = '';
+                screenshotFilename.textContent = '';
+            }
+
             try {
                 const response = await fetch('/remove', {
                     method: 'POST',
                     body: formData
                 });
-                if (!response.ok) throw new Error('Remove failed');
+                if (!response.ok) throw new Error('移除失敗');
                 fileList.removeChild(li);
             } catch (error) {
-                console.error('Error removing file:', error);
+                console.error('移除檔案錯誤:', error);
             }
         });
 
