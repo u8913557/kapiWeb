@@ -26,17 +26,6 @@ for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
 app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 app.mount("/output", StaticFiles(directory=OUTPUT_FOLDER), name="output")
 
-from utils.llm_utils import create_plain_llm
-
-# 延遲載入 LLM
-llm_chain = None
-
-def get_llm_chain():
-    global llm_chain
-    if llm_chain is None:
-        llm_chain = create_plain_llm()
-    return llm_chain
-
 # 首页路由
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
@@ -47,10 +36,11 @@ async def submit_chat(request: Request):
     form_data = await request.form()
     text = form_data.get('text')
 
-    llm_chain = get_llm_chain()
-    response = llm_chain.invoke(text)
-
-    return JSONResponse(content={"result": f"AI回答:\n{response}"})
+    # 假設前端傳遞一個唯一的 chat_id，若無則生成新 ID
+    chat_id = form_data.get('chat_id', str(uuid.uuid4()))
+    response = llm_invoke('web-chat', chat_id, text)
+    
+    return JSONResponse(content={"result": f"AI回答:\n{response}", "chat_id": chat_id})
 
 # 文件上傳路由
 @app.post("/upload")
@@ -128,8 +118,7 @@ async def call_ask(request: Request, x_line_signature: str = Header(None)):
     print("Request body:", body_str)
 
     try:
-        llm_chain = get_llm_chain()
-        handle_line_ask_message(body_str, signature, llm_chain)
+        handle_line_ask_message(body_str, signature)
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -146,8 +135,7 @@ async def call_assistant(request: Request, x_line_signature: str = Header(None))
     print("Request body:", body_str)
 
     try:
-        llm_chain = get_llm_chain()
-        handle_line_assistant_message(body_str, signature, llm_chain)
+        handle_line_assistant_message(body_str, signature)
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -155,3 +143,8 @@ async def call_assistant(request: Request, x_line_signature: str = Header(None))
         raise HTTPException(status_code=500, detail="Internal server error")
 
     return "OK"
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

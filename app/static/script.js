@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
     const chatHistory = document.getElementById('chat-history');
+    let chatId = null; // 儲存對話 ID
 
     // 提取按鈕生成邏輯為獨立函式
     function addFileToList(filename) {
@@ -196,6 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const formData = new FormData();
                 formData.append('text', message);
+                if (chatId) {
+                    formData.append('chat_id', chatId);
+                }
 
                 const response = await fetch('/chat-submit', {
                     method: 'POST',
@@ -210,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 3. 將後端的回應添加到聊天歷史中
                 addMessage(data.result, 'system');
+                chatId = data.chat_id; // 更新 chatId
             } catch (error) {
                 console.error('錯誤:', error);
                 addMessage('系統錯誤，請稍後再試。', 'system');
