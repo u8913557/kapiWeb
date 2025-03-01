@@ -14,11 +14,8 @@ from linebot.v3.messaging import (
     ReplyMessageRequest,
     TextMessage,
 )
-from langchain.schema import HumanMessage, SystemMessage
 
 from utils.llm_utils import llm_invoke
-from utils.redis_utils import getRedisHistoryChat
-
 
 # 配置 LINE Bot
 channel_access_token = 'channel_access_token'
@@ -70,7 +67,7 @@ def handle_line_assistant_message(body_str, signature):
     
     
 @handler2.add(MessageEvent, message=TextMessageContent)
-def message_text(event):
+def message_text2(event):
     with ApiClient(configuration2) as api_client:
         line_user_id = event.source.user_id
         print(f"Line 使用者 ID: {line_user_id}, 問題: {event.message.text}")

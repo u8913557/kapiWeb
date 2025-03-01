@@ -31,6 +31,9 @@ app.mount("/output", StaticFiles(directory=OUTPUT_FOLDER), name="output")
 async def read_index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+import uuid
+from utils.llm_utils import llm_invoke
+
 @app.post("/chat-submit")
 async def submit_chat(request: Request):
     form_data = await request.form()
