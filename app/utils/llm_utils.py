@@ -1,24 +1,27 @@
 # utils/llm_utils.py
+"""
+語言模型工具模組，提供基於 LLM 的對話功能。
+"""
+
 import os
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-
 from langchain.globals import set_llm_cache
 from langchain_community.cache import InMemoryCache
 
-from utils.redis_utils import getRedisHistoryChat, updateRedisHistoryChat
+from utils.redis_utils import get_redis_history_chat, update_redis_history_chat
 
 os.environ["OPENAI_API_KEY"] = 'OPENAI_API_KEY'
 os.environ['TAVILY_API_KEY'] = 'TAVILY_API_KEY
 
+# 啟用 LLM 快取
 set_llm_cache(InMemoryCache())
 
-# 定義模型
-llm_model = "gpt-4o-mini"
-
-llm = ChatOpenAI(
-    model=llm_model,
+# 定義模型與參數
+LLM_MODEL = "gpt-4o-mini"
+LLM = ChatOpenAI(
+    model=LLM_MODEL,
     cache=True,
     temperature=0.7,
     max_tokens=None,
@@ -26,12 +29,21 @@ llm = ChatOpenAI(
     max_retries=2,
     top_p=0.9
 )
+STR_PARSER = StrOutputParser()
 
-strParser = StrOutputParser()
+def llm_invoke(mode: str, user_id: str, question: str) -> str:
+    """
+    調用語言模型生成回應，並根據模式設定助手行為。
 
-def llm_invoke(mode, user_id, question):
+    Args:
+        mode (str): 對話模式，可為 'web-chat', 'line-ask' 或 'line-assistant'。
+        user_id (str): 使用者 ID，用於區分對話歷史。
+        question (str): 使用者的問題。
 
-    messages = getRedisHistoryChat(user_id)
+    Returns:
+        str: LLM 生成的回應。
+    """
+    messages = get_redis_history_chat(user_id)
 
     base_instruction = """
         你是一位負責處理使用者問題的助手，具備廣泛的知識和專業能力。
@@ -40,13 +52,11 @@ def llm_invoke(mode, user_id, question):
         根據使用者語言回應，若語言不明顯，預設使用中文
     """
 
-    if(mode == 'web-chat'):
+    if mode == 'web-chat':
         instruction = base_instruction + "\n保持簡潔友善的語氣，適合網頁聊天場景。"
-
-    elif(mode == 'line-ask'):
+    elif mode == 'line-ask':
         instruction = base_instruction + "\n以親切且快速的語氣回應，適應 Line 的即時通訊環境。"
-
-    elif(mode == 'line-assistant'):
+    elif mode == 'line-assistant':
         instruction = """
             我是賽巴斯欽・米卡艾利斯，一名執事，同時也是凡多姆海伍家的忠實僕人。
             我的本質是一名惡魔，原形為烏鴉，因此人類的攻擊對我無效。
@@ -74,30 +84,26 @@ def llm_invoke(mode, user_id, question):
 
             契約的內容:
             我與謝爾的契約約定如下：
-
             不對契約者說謊。
             對契約者的命令絕對服從。
             在契約者完成復仇為止，不能背叛，守護到底。
         """
-
     else:
         instruction = base_instruction
 
     # 檢查是否有 system 訊息，若無則插入
     if not any(msg["role"] == "system" for msg in messages):
         messages.insert(0, {"role": "system", "content": instruction})
-    
+
     # 加入當前使用者問題
     messages.append({"role": "user", "content": question})
 
-    # 構建 Prompt，將歷史訊息與當前問題結合
+    # 構建 Prompt 並生成回應
     prompt = ChatPromptTemplate.from_messages(messages)
-    llm_chain = prompt | llm | strParser
+    llm_chain = prompt | LLM | STR_PARSER
     response = llm_chain.invoke({"question": question})
 
-    # 更新 Redis 歷史，儲存問題和回應
-    updateRedisHistoryChat(user_id, question, response)
+    # 更新 Redis 歷史
+    update_redis_history_chat(user_id, question, response)
 
     return response
-
-
