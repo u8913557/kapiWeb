@@ -1,46 +1,50 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kapi AI/RAG Web</title>
-    <link rel="stylesheet" href="/static/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Kapi AI/RAG Web，提供檔案上傳與聊天功能">
+  <title>Kapi AI/RAG Web</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="main-container">
-        <!-- 左側區域 -->
-        <div class="left-panel">
-            <div class="upload-section">
-                <input type="file" id="file-upload" multiple>
-                <label for="file-upload" class="upload-button">上傳檔案</label>
-            </div>
-            <div class="file-list">
-                <h3>已上傳檔案</h3>
-                <ul id="file-list">
-                    <!-- 檔案列表將動態生成 -->
-                </ul>
-            </div>
-        </div>
-        <!-- 中間區域 -->
-        <div class="middle-panel">
-            <div class="screenshot-container" id="screenshot-container">
-                <!-- 多頁縮圖將動態生成在此 -->
-            </div>
-            <div class="screenshot-filename" id="screenshot-filename">
-                <!-- 檔案名稱將動態顯示在此 -->
-            </div>
-        </div>
-        <!-- 右側區域 -->
-        <div class="right-panel">
-            <div class="chat-history" id="chat-history">
-                <!-- 歷史訊息將動態添加在此 -->
-            </div>
-            <div class="chat-input">
-                <input type="text" id="chat-input" placeholder="輸入訊息...">
-                <button id="send-button">發送</button>
-            </div>
-        </div>
-    </div>
-    <script src="/static/script.js"></script>
+  <main class="main-container">
+    <!-- 左側區域 -->
+    <section class="left-panel" aria-label="檔案管理">
+      <div class="upload-section">
+        <input type="file" id="file-upload" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp">
+        <label for="file-upload" class="upload-button">上傳檔案</label>
+      </div>
+      <div class="file-list">
+        <h3>已上傳檔案</h3>
+        <ul id="file-list" aria-live="polite">
+          <!-- 檔案列表將動態生成 -->
+        </ul>
+      </div>
+    </section>
+
+    <!-- 中間區域 -->
+    <section class="middle-panel" aria-label="檔案預覽">
+      <div class="screenshot-container" id="screenshot-container">
+        <!-- 多頁縮圖將動態生成在此 -->
+      </div>
+      <div class="screenshot-filename" id="screenshot-filename" aria-live="polite">
+        <!-- 檔案名稱將動態顯示在此 -->
+      </div>
+    </section>
+
+    <!-- 右側區域 -->
+    <section class="right-panel" aria-label="聊天區">
+      <div class="chat-history" id="chat-history" role="log" aria-live="polite">
+        <!-- 歷史訊息將動態添加在此 -->
+      </div>
+      <div class="chat-input">
+        <input type="text" id="chat-input" placeholder="輸入訊息..." aria-label="聊天輸入框">
+        <button type="button" id="send-button" aria-label="發送訊息">發送</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/script.js" defer></script>
 </body>
 </html>
