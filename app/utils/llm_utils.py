@@ -4,12 +4,12 @@
 """
 
 import os
+import asyncio
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain.globals import set_llm_cache
 from langchain_community.cache import InMemoryCache
-
 from utils.redis_utils import get_redis_history_chat, update_redis_history_chat
 
 os.environ["OPENAI_API_KEY"] = 'OPENAI_API_KEY'
@@ -29,9 +29,11 @@ LLM = ChatOpenAI(
     max_retries=2,
     top_p=0.9
 )
+
 STR_PARSER = StrOutputParser()
 
-def llm_invoke(mode: str, user_id: str, question: str) -> str:
+# 異步版本的 llm_invoke
+async def llm_invoke(mode: str, user_id: str, question: str) -> str:
     """
     調用語言模型生成回應，並根據模式設定助手行為。
 
@@ -43,7 +45,7 @@ def llm_invoke(mode: str, user_id: str, question: str) -> str:
     Returns:
         str: LLM 生成的回應。
     """
-    messages = get_redis_history_chat(user_id)
+    messages = await get_redis_history_chat(user_id)
 
     base_instruction = """
         你是一位負責處理使用者問題的助手，具備廣泛的知識和專業能力。
@@ -91,19 +93,15 @@ def llm_invoke(mode: str, user_id: str, question: str) -> str:
     else:
         instruction = base_instruction
 
-    # 檢查是否有 system 訊息，若無則插入
     if not any(msg["role"] == "system" for msg in messages):
         messages.insert(0, {"role": "system", "content": instruction})
 
-    # 加入當前使用者問題
     messages.append({"role": "user", "content": question})
 
-    # 構建 Prompt 並生成回應
     prompt = ChatPromptTemplate.from_messages(messages)
     llm_chain = prompt | LLM | STR_PARSER
-    response = llm_chain.invoke({"question": question})
+    response = await llm_chain.ainvoke({'question': question})  # 使用異步版本 ainvoke
 
-    # 更新 Redis 歷史
-    update_redis_history_chat(user_id, question, response)
-
+    await update_redis_history_chat(user_id, question, response)
+    
     return response

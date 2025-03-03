@@ -139,6 +139,7 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
       }, 5000); // 每 5 秒更新一次
 
       try {
+        // 啟動 RAG 處理
         const response = await fetch('/rag', {
           method: 'POST',
           headers: {
@@ -148,47 +149,67 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
         });
         const data = await response.json();
 
-        // 清除計時器
-        clearInterval(timer);
-
-        if (response.ok) {
-          console.log('RAG 處理成功:', filename);
-        
-          // 先顯示截圖
-          screenshotContainer.innerHTML = '';
-          screenshotFilename.textContent = filename;
-          if (data.thumbnails && data.thumbnails.length > 0) {
-            data.thumbnails.forEach(thumb => {
-              const img = document.createElement('img');
-              img.src = thumb;
-              img.alt = `Thumbnail of ${filename}`;
-              img.style.display = 'block';
-              screenshotContainer.appendChild(img);
-            });
-            console.log('截圖顯示成功:', data.thumbnails);
-          } else {
-            console.log('無可用截圖');
-          }
-
-          // 更新為已處理狀態
-          li.classList.add('rag-processed');
-          li.removeChild(ragElement);
-          const processedTag = document.createElement('span');
-          processedTag.textContent = ' (已 RAG 處理)';
-          processedTag.style.color = 'green';
-          li.appendChild(processedTag);
-        } else {
-          console.error('RAG 處理失敗:', data.error);
-          alert(`RAG 處理失敗: ${data.error}`);
-          // 恢復按鈕狀態
+        if (!response.ok) {
+          clearInterval(timer);
+          console.error('RAG 處理啟動失敗:', data.error);
+          alert(`RAG 處理啟動失敗: ${data.error}`);
           ragElement.textContent = 'RAG 處理';
           ragElement.disabled = false;
+          return;
         }
+
+        console.log('RAG 處理已啟動:', filename);
+
+        // 顯示截圖
+        screenshotContainer.innerHTML = '';
+        screenshotFilename.textContent = filename;
+        if (data.thumbnails && data.thumbnails.length > 0) {
+          data.thumbnails.forEach(thumb => {
+            const img = document.createElement('img');
+            img.src = thumb;
+            img.alt = `Thumbnail of ${filename}`;
+            img.style.display = 'block';
+            screenshotContainer.appendChild(img);
+          });
+          console.log('截圖顯示成功:', data.thumbnails);
+        } else {
+          console.log('無可用截圖');
+        }
+
+        // 建立 WebSocket 連線
+        const ws = new WebSocket(`ws://${window.location.host}/ws/rag-status/${filename}`);
+        ws.onopen = () => {
+          console.log('WebSocket 連線建立:', filename);
+        };
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          console.log('WebSocket 收到訊息:', data);
+          if (data.filename === filename && data.is_complete) {
+            clearInterval(timer);
+            li.classList.add('rag-processed');
+            li.removeChild(ragElement);
+            const processedTag = document.createElement('span');
+            processedTag.textContent = ' (已 RAG 處理)';
+            processedTag.style.color = 'green';
+            li.appendChild(processedTag);
+            console.log('RAG 處理完成:', filename);
+            ws.close();
+          }
+        };
+        ws.onerror = (error) => {
+          clearInterval(timer);
+          console.error('WebSocket 錯誤:', error);
+          alert('RAG 狀態監控失敗');
+          ragElement.textContent = 'RAG 處理';
+          ragElement.disabled = false;
+        };
+        ws.onclose = () => {
+          console.log('WebSocket 連線關閉:', filename);
+        };
       } catch (error) {
+        clearInterval(timer);
         console.error('RAG 處理錯誤:', error);
         alert('RAG 處理發生異常，請查看控制台');
-        // 恢復按鈕狀態
-        clearInterval(timer);
         ragElement.textContent = 'RAG 處理';
         ragElement.disabled = false;
       }
@@ -222,7 +243,6 @@ async function loadFileList(fileList, screenshotContainer, screenshotFilename) {
   }
 }
 
-// 更新 fileUpload 事件處理
 document.addEventListener('DOMContentLoaded', () => {
   const fileUpload = document.getElementById('file-upload');
   const fileList = document.getElementById('file-list');
@@ -256,7 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
           throw new Error('Upload failed');
         }
         const data = await response.json();
-        // 直接使用後端返回的物件格式
         addFileToList({ filename: data.filename, is_rag_processed: data.is_rag_processed }, fileList, screenshotContainer, screenshotFilename);
       } catch (error) {
         console.error('Error uploading file:', error);
@@ -270,6 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    console.log('提交聊天訊息:', message); // 添加日誌檢查觸發
     addMessage(message, 'user');
     chatInput.value = '';
 
@@ -280,18 +300,21 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('chat_id', chatId);
       }
 
+      console.log('發送聊天請求...');
       const response = await fetch('/chat-submit', {
         method: 'POST',
         body: formData,
       });
+      console.log('收到聊天回應狀態:', response.status); // 檢查回應狀態
       if (!response.ok) {
         throw new Error('後端回應異常');
       }
       const data = await response.json();
+      console.log('聊天回應內容:', data); // 檢查回應內容
       addMessage(data.result, 'system');
       chatId = data.chat_id;
     } catch (error) {
-      console.error('錯誤:', error);
+      console.error('聊天提交錯誤:', error);
       addMessage('系統錯誤，請稍後再試。', 'system');
     }
   });
