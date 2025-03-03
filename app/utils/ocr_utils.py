@@ -10,17 +10,6 @@ from PIL import Image
 import pytesseract
 from pdf2image import convert_from_path
 
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import (
-    AcceleratorDevice,
-    AcceleratorOptions,
-    EasyOcrOptions,
-    PdfPipelineOptions
-)
-from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
-from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
-
 
 def extract_text_from_file(file_location: str, output_folder: str) -> List[str]:
     """
@@ -129,9 +118,28 @@ def generate_pdf_thumbnails(file_path: str, output_folder: str, dpi: int = 300) 
         print(f"製作縮圖時發生錯誤：{error}")
         return []
 
-def docling_extract_text_from_file(file_location: str, output_folder: str) -> Union[str, str]:
+
+from docling.document_converter import (
+    DocumentConverter,
+    PdfFormatOption,
+    WordFormatOption,
+    InputFormat,
+)
+from docling.datamodel.pipeline_options import (
+    EasyOcrOptions,
+    PdfPipelineOptions,
+    AcceleratorDevice,
+    AcceleratorOptions,
+)
+from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
+from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+from pathlib import Path
+import json
+import logging
+
+def docling_extract_text_from_file(file_location: str, output_folder: str) -> str:
     """
-    使用 Docling 從 PDF 檔案中提取文字。
+    使用 Docling 從不同類型文件中提取文字和表格內容。
 
     Args:
         file_location (str): 輸入檔案路徑。
@@ -142,44 +150,83 @@ def docling_extract_text_from_file(file_location: str, output_folder: str) -> Un
     """
     try:
         input_doc_path = Path(file_location)
+        if not input_doc_path.exists():
+            raise FileNotFoundError(f"檔案不存在: {file_location}")
 
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = True
-        pipeline_options.do_table_structure = True
-        pipeline_options.table_structure_options.do_cell_matching = True
-        #pipeline_options.ocr_options = TesseractCliOcrOptions(lang=["chi_tra+eng+chi_sim"])
-        pipeline_options.ocr_options = EasyOcrOptions(lang=["en", "ch_tra", "ch_sim"])
-        pipeline_options.accelerator_options = AcceleratorOptions(
+        logging.info(f"處理檔案: {input_doc_path.absolute()}")
+
+        # 定義 OCR 選項，支持英文和中文（繁體、簡體）
+        ocr_options = EasyOcrOptions(lang=["en", "ch_tra"])
+
+        # 定義 PDF 的管道選項，啟用 OCR 和表格結構提取
+        pdf_pipeline_options = PdfPipelineOptions()
+        pdf_pipeline_options.do_ocr = True
+        pdf_pipeline_options.do_table_structure = True
+        pdf_pipeline_options.table_structure_options.do_cell_matching = True
+        pdf_pipeline_options.ocr_options = ocr_options
+        pdf_pipeline_options.accelerator_options = AcceleratorOptions(
             num_threads=10,
             device=AcceleratorDevice.AUTO
         )
 
-        doc_converter = DocumentConverter(
-            format_options={
-                InputFormat.PDF: PdfFormatOption(
-                    pipeline_cls=StandardPdfPipeline,
-                    pipeline_options=pipeline_options,
-                    backend=PyPdfiumDocumentBackend
-                )
-            }
-        )
+        # 根據文件類型設置格式選項
+        extension = input_doc_path.suffix.lower()
+        format_options = {}
+        if extension == ".pdf":
+            format_options[InputFormat.PDF] = PdfFormatOption(
+                pipeline_cls=StandardPdfPipeline,
+                pipeline_options=pdf_pipeline_options,
+                backend=PyPdfiumDocumentBackend
+            )
+        elif extension in [".docx", ".doc"]:
+            format_options[InputFormat.WORD] = WordFormatOption()
+        else:
+            raise ValueError(f"不支援的文件類型: {extension}")
 
+        # 初始化 DocumentConverter
+        doc_converter = DocumentConverter(format_options=format_options)
         conv_result = doc_converter.convert(input_doc_path)
+
+        # 獲取文檔對象
+        document = conv_result.document
+
+        # 創建輸出子目錄
         output_dir = Path(output_folder)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        full_text_path = output_dir / "full_text.txt"
+        # 獲取基本文件名（不含擴展名）
+        base_filename = input_doc_path.stem
+
+        # 保存完整文字內容（TXT 格式）
+        full_text_path = output_dir / f"{base_filename}_full_text.txt"
         with full_text_path.open("w", encoding="utf-8") as file_handle:
-            file_handle.write(conv_result.document.export_to_text())
+            file_handle.write(document.export_to_text())
 
-        doctags_path = output_dir / "full_text.doctags"
+        # 保存完整文字內容（Markdown 格式）
+        full_text_md_path = output_dir / f"{base_filename}_full_text.md"
+        with full_text_md_path.open("w", encoding="utf-8") as file_handle:
+            file_handle.write(document.export_to_markdown())
+
+        # 保存文檔標記
+        doctags_path = output_dir / f"{base_filename}_full_text.doctags"
         with doctags_path.open("w", encoding="utf-8") as file_handle:
-            file_handle.write(conv_result.document.export_to_document_tokens())
+            file_handle.write(document.export_to_document_tokens())
 
-        all_text = conv_result.document.export_to_text()
+        # 保存表格數據（若存在）
+        tables = document.tables
+        if tables:
+            table_data = []
+            for table in tables:
+                table_dict = {"rows": table.rows}
+                table_data.append(table_dict)
+            table_json_path = output_dir / f"{base_filename}_tables.json"
+            with table_json_path.open("w", encoding="utf-8") as f:
+                json.dump(table_data, f)
+
+        # 返回完整文字內容
+        all_text = document.export_to_text()
         return all_text
 
     except Exception as error:
-        logging.error(f"處理檔案 {file_location} 時發生錯誤：{error}")
-        return f"Error: {error}"
-    
+        logging.error(f"處理檔案 {file_location} 時失敗：{str(error)}", exc_info=True)
+        return f"錯誤: {error}"

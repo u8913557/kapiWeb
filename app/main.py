@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from utils.llm_utils import llm_invoke
-from utils.ocr_utils import generate_pdf_thumbnails, get_existing_thumbnails
+from utils.ocr_utils import generate_pdf_thumbnails, get_existing_thumbnails, docling_extract_text_from_file
 from utils.line_bot_handler import handle_line_ask_message, handle_line_assistant_message
 
 logging.basicConfig(level=logging.INFO)  # 改為 INFO 以捕捉更多資訊
@@ -120,13 +120,26 @@ async def remove_file(request: Request) -> JSONResponse:
 # 獲取已上傳檔案列表
 @app.get("/files")
 async def get_uploaded_files() -> JSONResponse:
-    """獲取 UPLOAD_FOLDER 中的檔案列表。
+    """獲取 UPLOAD_FOLDER 中的檔案列表及其 RAG 處理狀態。
 
     Returns:
-        JSONResponse: 包含檔案列表或錯誤訊息的 JSON 響應。
+        JSONResponse: 包含檔案列表及其狀態的 JSON 響應。
     """
     try:
-        files: List[str] = os.listdir(UPLOAD_FOLDER)
+        files = []
+        for f in UPLOAD_FOLDER.iterdir():
+            if f.is_file():
+                base_filename = f.stem
+                output_subfolder = OUTPUT_FOLDER / base_filename
+                # 檢查 .txt, .md 和 .doctags 文件是否皆存在
+                txt_exists = (output_subfolder / f"{base_filename}_full_text.txt").exists()
+                md_exists = (output_subfolder / f"{base_filename}_full_text.md").exists()
+                doctags_exists = (output_subfolder / f"{base_filename}_full_text.doctags").exists()
+                is_rag_processed = txt_exists and md_exists and doctags_exists
+                files.append({
+                    "filename": f.name,
+                    "is_rag_processed": is_rag_processed
+                })
         return JSONResponse(content={"files": files})
     except Exception as error:
         return JSONResponse(content={"error": str(error)}, status_code=500)
@@ -160,6 +173,55 @@ async def screenshot_files(request: Request) -> JSONResponse:
         thumbnail_paths = generate_pdf_thumbnails(str(file_path), str(output_subfolder))
         return JSONResponse(content={"thumbnails": thumbnail_paths})
     return JSONResponse(content={"thumbnails": [f"/uploads/{filename}"]})
+
+# RAG 處理路由
+@app.post("/rag")
+async def rag_files(request: Request) -> JSONResponse:
+    data = await request.json()
+    filename = data.get("filename")
+    if not filename:
+        logging.error("未提供文件名")
+        return JSONResponse({"error": "未提供文件名"}, status_code=400)
+    
+    file_location = UPLOAD_FOLDER / filename
+    base_filename = Path(filename).stem
+    output_subfolder = OUTPUT_FOLDER / base_filename  # 使用子目錄
+    
+    logging.info(f"當前工作目錄: {Path.cwd()}")
+    logging.info(f"嘗試處理檔案: {file_location}")
+    
+    if not file_location.exists():
+        logging.error(f"檔案不存在: {file_location}")
+        return JSONResponse({"error": f"檔案不存在: {file_location}"}, status_code=404)
+    
+    try:
+        # 先執行截圖功能
+        logging.info(f"生成截圖: {file_location}")
+        thumbnails = []
+        if file_location.suffix.lower() == '.pdf':
+            existing_thumbnails = get_existing_thumbnails(filename, str(output_subfolder))
+            if existing_thumbnails:
+                thumbnails = existing_thumbnails
+            else:
+                thumbnails = generate_pdf_thumbnails(str(file_location), str(output_subfolder))
+        else:
+            thumbnails = [f"/uploads/{filename}"]
+        
+        # 再執行 RAG 處理
+        result = docling_extract_text_from_file(str(file_location), str(output_subfolder))
+        if result.startswith("錯誤:"):
+            logging.error(f"RAG 處理失敗: {result}")
+            return JSONResponse({"error": result}, status_code=500)
+        
+        logging.info(f"RAG 處理完成: {file_location}")
+        return JSONResponse({
+            "message": "RAG 處理完成",
+            "result": result,
+            "thumbnails": thumbnails
+        })
+    except Exception as e:
+        logging.error(f"RAG 處理異常: {str(e)}", exc_info=True)
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 # LINE-BOT 路由
 @app.post("/ask")

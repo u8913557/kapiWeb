@@ -19,12 +19,15 @@ function addMessage(text, sender) {
 
 /**
  * 將檔案添加到檔案列表並綁定按鈕事件。
- * @param {string} filename - 檔案名稱。
+ * @param {Object} fileData - 檔案資訊，包含 filename 和 is_rag_processed。
  * @param {HTMLElement} fileList - 檔案列表容器。
  * @param {HTMLElement} screenshotContainer - 截圖顯示容器。
  * @param {HTMLElement} screenshotFilename - 截圖檔案名稱顯示元素。
  */
-function addFileToList(filename, fileList, screenshotContainer, screenshotFilename) {
+function addFileToList(fileData, fileList, screenshotContainer, screenshotFilename) {
+  const filename = fileData.filename;
+  const isRagProcessed = fileData.is_rag_processed;
+
   const li = document.createElement('li');
   li.textContent = filename;
   li.dataset.filename = filename;
@@ -113,26 +116,68 @@ function addFileToList(filename, fileList, screenshotContainer, screenshotFilena
     }
   });
 
-  // RAG 處理按鈕
-  const ragButton = document.createElement('button');
-  ragButton.textContent = 'RAG 處理';
-  ragButton.className = 'rag-button';
-  ragButton.addEventListener('click', () => {
-    console.log('RAG 處理:', filename);
-    li.classList.add('rag-processed');
-    li.removeChild(ragButton);
-    const processedTag = document.createElement('span');
-    processedTag.textContent = ' (已 RAG 處理)';
-    processedTag.style.color = 'green';
-    li.appendChild(processedTag);
-  });
+  // RAG 處理按鈕或狀態
+  let ragElement;
+  if (isRagProcessed) {
+    ragElement = document.createElement('span');
+    ragElement.textContent = ' (已 RAG 處理)';
+    ragElement.style.color = 'green';
+  } else {
+    ragElement = document.createElement('button');
+    ragElement.textContent = 'RAG 處理';
+    ragElement.className = 'rag-button';
+    ragElement.addEventListener('click', async () => {
+      console.log('開始 RAG 處理:', filename);
+      try {
+        const response = await fetch('/rag', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ filename }),
+        });
+        const data = await response.json();
+        if (response.ok) {
+          console.log('RAG 處理成功:', filename);
+          
+          // 先顯示截圖
+          screenshotContainer.innerHTML = '';
+          screenshotFilename.textContent = filename;
+          if (data.thumbnails && data.thumbnails.length > 0) {
+            data.thumbnails.forEach(thumb => {
+              const img = document.createElement('img');
+              img.src = thumb;
+              img.alt = `Thumbnail of ${filename}`;
+              img.style.display = 'block';
+              screenshotContainer.appendChild(img);
+            });
+            console.log('截圖顯示成功:', data.thumbnails);
+          } else {
+            console.log('無可用截圖');
+          }
 
-  li.appendChild(removeButton);
-  li.appendChild(screenshotButton);
-  if (!li.classList.contains('rag-processed')) {
-    li.appendChild(ragButton);
+          // 更新按鈕狀態
+          li.classList.add('rag-processed');
+          li.removeChild(ragElement);
+          const processedTag = document.createElement('span');
+          processedTag.textContent = ' (已 RAG 處理)';
+          processedTag.style.color = 'green';
+          li.appendChild(processedTag);
+        } else {
+          console.error('RAG 處理失敗:', data.error);
+          alert(`RAG 處理失敗: ${data.error}`);
+        }
+      } catch (error) {
+        console.error('RAG 處理錯誤:', error);
+        alert('RAG 處理發生異常，請查看控制台');
+      }
+    });
   }
 
+  // 調整順序：移除 -> 截圖 -> RAG
+  li.appendChild(removeButton);
+  li.appendChild(screenshotButton);
+  li.appendChild(ragElement);
   fileList.appendChild(li);
 }
 
@@ -190,7 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
           throw new Error('Upload failed');
         }
         const data = await response.json();
-        addFileToList(data.filename, fileList, screenshotContainer, screenshotFilename);
+        // 直接使用後端返回的物件格式
+        addFileToList({ filename: data.filename, is_rag_processed: data.is_rag_processed }, fileList, screenshotContainer, screenshotFilename);
       } catch (error) {
         console.error('Error uploading file:', error);
       }
