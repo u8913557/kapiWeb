@@ -3,9 +3,11 @@
 FastAPI 應用主程式，提供檔案上傳、聊天功能及 Line Bot 服務。
 """
 
-import os
+import shutil
 import uuid
 from typing import List
+import logging
+from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, Request, Header, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -16,23 +18,24 @@ from utils.llm_utils import llm_invoke
 from utils.ocr_utils import generate_pdf_thumbnails, get_existing_thumbnails
 from utils.line_bot_handler import handle_line_ask_message, handle_line_assistant_message
 
+logging.basicConfig(level=logging.INFO)  # 改為 INFO 以捕捉更多資訊
+
 # 初始化 FastAPI 應用
 app = FastAPI(title="Chat and File Management API")
 
 # 配置模板和靜態檔案
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-TEMPLATES = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+BASE_DIR = Path(__file__).parent.absolute()  # 使用 Path 获取當前文件的父目錄
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
 
 # 定義上傳和輸出資料夾
-APP_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(APP_DIR, 'uploads')
-OUTPUT_FOLDER = os.path.join(APP_DIR, 'output')
+APP_DIR = Path(__file__).parent.absolute()
+UPLOAD_FOLDER = APP_DIR / "uploads"
+OUTPUT_FOLDER = APP_DIR / "output"
 
 # 確保資料夾存在
 for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+    folder.mkdir(parents=True, exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 app.mount("/output", StaticFiles(directory=OUTPUT_FOLDER), name="output")
@@ -78,15 +81,15 @@ async def upload_file(file: UploadFile = File(...)) -> JSONResponse:
     Returns:
         JSONResponse: 上傳成功的訊息與檔案名稱。
     """
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    with open(file_path, "wb") as file_handle:
+    file_path = UPLOAD_FOLDER / file.filename
+    with file_path.open("wb") as file_handle:
         file_handle.write(await file.read())
     return JSONResponse(content={"message": "File uploaded successfully", "filename": file.filename})
 
 # 移除檔案路由
 @app.post("/remove")
 async def remove_file(request: Request) -> JSONResponse:
-    """移除指定檔案及其相關截圖。
+    """移除指定檔案及其相關輸出子目錄。
 
     Args:
         request (Request): FastAPI 請求對象，包含表單數據。
@@ -96,23 +99,23 @@ async def remove_file(request: Request) -> JSONResponse:
     """
     form_data = await request.form()
     filename = form_data.get('filename')
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file_path = UPLOAD_FOLDER / filename
 
-    if os.path.exists(file_path):
-        os.remove(file_path)
+    # 刪除上傳檔案
+    if file_path.exists():
+        file_path.unlink()
+    else:
+        logging.warning(f"移除時檔案不存在: {file_path}")
 
-    # 移除相關截圖
-    base_filename = os.path.splitext(filename)[0]
-    page_num = 1
-    while True:
-        screenshot_path = os.path.join(OUTPUT_FOLDER, f"{base_filename}_page_{page_num}.png")
-        if os.path.exists(screenshot_path):
-            os.remove(screenshot_path)
-            page_num += 1
-        else:
-            break
+    # 移除相關輸出子目錄
+    base_filename = Path(filename).stem
+    output_subfolder = OUTPUT_FOLDER / base_filename
+    if output_subfolder.exists() and output_subfolder.is_dir():
+        shutil.rmtree(output_subfolder)
+        logging.info(f"已移除輸出子目錄: {output_subfolder}")
+    
+    return JSONResponse(content={"message": "檔案及其相關輸出已移除"})
 
-    return JSONResponse(content={"message": "檔案及其截圖已移除"})
 
 # 獲取已上傳檔案列表
 @app.get("/files")
@@ -141,16 +144,20 @@ async def screenshot_files(request: Request) -> JSONResponse:
     """
     form_data = await request.form()
     filename = form_data.get('file_path')
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file_path = UPLOAD_FOLDER / filename
 
-    if not os.path.exists(file_path):
+    if not file_path.exists():
         return JSONResponse(content={"error": "檔案不存在"}, status_code=404)
 
-    if file_path.lower().endswith('.pdf'):
-        existing_thumbnails = get_existing_thumbnails(filename, OUTPUT_FOLDER)
+    # 使用文件名（不含擴展名）作為子目錄
+    base_filename = Path(filename).stem
+    output_subfolder = OUTPUT_FOLDER / base_filename
+
+    if file_path.suffix.lower() == '.pdf':
+        existing_thumbnails = get_existing_thumbnails(filename, str(output_subfolder))
         if existing_thumbnails:
             return JSONResponse(content={"thumbnails": existing_thumbnails})
-        thumbnail_paths = generate_pdf_thumbnails(file_path, OUTPUT_FOLDER)
+        thumbnail_paths = generate_pdf_thumbnails(str(file_path), str(output_subfolder))
         return JSONResponse(content={"thumbnails": thumbnail_paths})
     return JSONResponse(content={"thumbnails": [f"/uploads/{filename}"]})
 
@@ -210,4 +217,3 @@ async def call_assistant(request: Request, x_line_signature: str = Header(None))
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-    

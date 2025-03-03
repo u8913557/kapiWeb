@@ -2,7 +2,6 @@
 /**
  * 前端腳本，用於處理檔案上傳、截圖顯示和聊天功能。
  */
-
 console.log('script.js 開始執行');
 
 /**
@@ -151,12 +150,13 @@ async function loadFileList(fileList, screenshotContainer, screenshotFilename) {
     }
     const data = await response.json();
     fileList.innerHTML = '';
-    data.files.forEach(filename => addFileToList(filename, fileList, screenshotContainer, screenshotFilename));
+    data.files.forEach(fileData => addFileToList(fileData, fileList, screenshotContainer, screenshotFilename));
   } catch (error) {
     console.error('獲取檔案列表時出錯:', error);
   }
 }
 
+// 更新 fileUpload 事件處理
 document.addEventListener('DOMContentLoaded', () => {
   const fileUpload = document.getElementById('file-upload');
   const fileList = document.getElementById('file-list');

@@ -2,10 +2,6 @@
 """
 OCR 工具模組，提供檔案文字提取與 PDF 縮圖生成功能。
 """
-
-import os
-import shutil
-import logging
 from typing import List, Union
 from pathlib import Path
 
@@ -25,8 +21,6 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 
-# 配置日誌
-logging.basicConfig(level=logging.INFO)
 
 def extract_text_from_file(file_location: str, output_folder: str) -> List[str]:
     """
@@ -41,9 +35,11 @@ def extract_text_from_file(file_location: str, output_folder: str) -> List[str]:
     """
     dpi = 300
     lang = "chi_tra+eng"
-    file_extension = os.path.splitext(file_location)[1].lower()
+    file_path = Path(file_location)
+    file_extension = file_path.suffix.lower()
     image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'}
     all_text = []
+    output_dir = Path(output_folder)
 
     if file_extension == '.pdf':
         images = convert_from_path(
@@ -58,8 +54,8 @@ def extract_text_from_file(file_location: str, output_folder: str) -> List[str]:
             text = pytesseract.image_to_string(img, lang=lang, config="--psm 6 --oem 3")
             all_text.append(text)
 
-            page_output = os.path.join(output_folder, f"page_{i + 1}.txt")
-            with open(page_output, "w", encoding="utf-8") as file_handle:
+            page_output = output_dir / f"page_{i + 1}.txt"
+            with page_output.open("w", encoding="utf-8") as file_handle:
                 file_handle.write(text)
                 print(f"Page {i + 1} OCR 完成，保存至 {page_output}")
 
@@ -69,8 +65,8 @@ def extract_text_from_file(file_location: str, output_folder: str) -> List[str]:
         text = pytesseract.image_to_string(img_np, lang=lang, config="--psm 6 --oem 3")
         all_text.append(text)
 
-    final_output = os.path.join(output_folder, "full_text.txt")
-    with open(final_output, "w", encoding="utf-8") as file_handle:
+    final_output = output_dir / "full_text.txt"
+    with final_output.open("w", encoding="utf-8") as file_handle:
         file_handle.write("\n".join(all_text))
         print(f"全文 OCR 完成，合併文件保存至 {final_output}")
 
@@ -83,18 +79,20 @@ def get_existing_thumbnails(filename: str, output_folder: str) -> List[str]:
 
     Args:
         filename (str): 檔案名稱。
-        output_folder (str): 縮圖儲存資料夾。
+        output_folder (str): 縮圖儲存子目錄（例如 output/<filename>）。
 
     Returns:
         List[str]: 現有縮圖的路徑列表。
     """
-    base_filename = os.path.splitext(filename)[0]
+    output_dir = Path(output_folder)
+    base_filename = Path(filename).stem
     existing_paths = []
     page_num = 1
     while True:
-        output_path = os.path.join(output_folder, f"{base_filename}_page_{page_num}.png")
-        if os.path.exists(output_path):
-            existing_paths.append(f"/output/{base_filename}_page_{page_num}.png")
+        output_path = output_dir / f"{base_filename}_page_{page_num}.png"
+        if output_path.exists():
+            # 更新路徑以反映子目錄結構
+            existing_paths.append(f"/output/{base_filename}/{base_filename}_page_{page_num}.png")
             page_num += 1
         else:
             break
@@ -106,7 +104,7 @@ def generate_pdf_thumbnails(file_path: str, output_folder: str, dpi: int = 300) 
 
     Args:
         file_path (str): PDF 檔案路徑。
-        output_folder (str): 縮圖儲存資料夾路徑。
+        output_folder (str): 縮圖儲存子目錄（例如 output/<filename>）。
         dpi (int): 縮圖品質，預設為 300。
 
     Returns:
@@ -114,13 +112,16 @@ def generate_pdf_thumbnails(file_path: str, output_folder: str, dpi: int = 300) 
     """
     try:
         images = convert_from_path(file_path)
+        output_dir = Path(output_folder)
+        output_dir.mkdir(parents=True, exist_ok=True)  # 確保子目錄存在
         output_paths = []
-        base_filename = os.path.splitext(os.path.basename(file_path))[0]
+        base_filename = Path(file_path).stem
 
         for i, image in enumerate(images):
-            output_path = os.path.join(output_folder, f"{base_filename}_page_{i + 1}.png")
-            image.save(output_path, 'PNG')
-            output_paths.append(f"/output/{base_filename}_page_{i + 1}.png")
+            output_path = output_dir / f"{base_filename}_page_{i + 1}.png"
+            image.save(str(output_path), 'PNG')
+            # 更新路徑以反映子目錄結構
+            output_paths.append(f"/output/{base_filename}/{base_filename}_page_{i + 1}.png")
 
         return output_paths
 
@@ -134,10 +135,10 @@ def docling_extract_text_from_file(file_location: str, output_folder: str) -> Un
 
     Args:
         file_location (str): 輸入檔案路徑。
-        output_folder (str): 輸出文字檔案的資料夾。
+        output_folder (str): 輸出文字和表格檔案的子目錄（例如 output/<filename>）。
 
     Returns:
-        Union[str, str]: 提取的文字內容，若失敗則返回錯誤訊息。
+        str: 提取的文字內容，若失敗則返回錯誤訊息。
     """
     try:
         input_doc_path = Path(file_location)
