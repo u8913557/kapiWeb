@@ -80,6 +80,7 @@ body, html {
 
 .rag-button {
     margin-left: 10px;
+    min-width: 120px; /* 確保文字不被截斷 */
 }
 
 .screenshot-button {

@@ -128,6 +128,16 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
     ragElement.className = 'rag-button';
     ragElement.addEventListener('click', async () => {
       console.log('開始 RAG 處理:', filename);
+
+      // 初始化計時器
+      let secondsElapsed = 0;
+      ragElement.textContent = `RAG 處理中... 經過${secondsElapsed}秒`;
+      ragElement.disabled = true; // 禁用按鈕避免重複點擊
+      const timer = setInterval(() => {
+        secondsElapsed += 5;
+        ragElement.textContent = `RAG 處理中... 經過${secondsElapsed}秒`;
+      }, 5000); // 每 5 秒更新一次
+
       try {
         const response = await fetch('/rag', {
           method: 'POST',
@@ -137,9 +147,13 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
           body: JSON.stringify({ filename }),
         });
         const data = await response.json();
+
+        // 清除計時器
+        clearInterval(timer);
+
         if (response.ok) {
           console.log('RAG 處理成功:', filename);
-          
+        
           // 先顯示截圖
           screenshotContainer.innerHTML = '';
           screenshotFilename.textContent = filename;
@@ -156,7 +170,7 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
             console.log('無可用截圖');
           }
 
-          // 更新按鈕狀態
+          // 更新為已處理狀態
           li.classList.add('rag-processed');
           li.removeChild(ragElement);
           const processedTag = document.createElement('span');
@@ -166,10 +180,17 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
         } else {
           console.error('RAG 處理失敗:', data.error);
           alert(`RAG 處理失敗: ${data.error}`);
+          // 恢復按鈕狀態
+          ragElement.textContent = 'RAG 處理';
+          ragElement.disabled = false;
         }
       } catch (error) {
         console.error('RAG 處理錯誤:', error);
         alert('RAG 處理發生異常，請查看控制台');
+        // 恢復按鈕狀態
+        clearInterval(timer);
+        ragElement.textContent = 'RAG 處理';
+        ragElement.disabled = false;
       }
     });
   }
