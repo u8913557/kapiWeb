@@ -63,6 +63,7 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
       fileList.removeChild(li);
     } catch (error) {
       console.error('移除檔案錯誤:', error);
+      alert('移除檔案失敗: ' + error.message);
     }
   });
 
@@ -160,46 +161,62 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
 
         console.log('RAG 處理已啟動:', filename);
 
-        // 顯示截圖
+        // 清空截圖區域，等待 WebSocket 完成
         screenshotContainer.innerHTML = '';
         screenshotFilename.textContent = filename;
-        if (data.thumbnails && data.thumbnails.length > 0) {
-          data.thumbnails.forEach(thumb => {
-            const img = document.createElement('img');
-            img.src = thumb;
-            img.alt = `Thumbnail of ${filename}`;
-            img.style.display = 'block';
-            screenshotContainer.appendChild(img);
-          });
-          console.log('截圖顯示成功:', data.thumbnails);
-        } else {
-          console.log('無可用截圖');
-        }
 
         // 建立 WebSocket 連線
         const ws = new WebSocket(`ws://${window.location.host}/ws/rag-status/${filename}`);
         ws.onopen = () => {
           console.log('WebSocket 連線建立:', filename);
         };
-        ws.onmessage = (event) => {
+        ws.onmessage = async (event) => {
           const data = JSON.parse(event.data);
           console.log('WebSocket 收到訊息:', data);
-          if (data.filename === filename && data.is_complete) {
+          if (data.filename === filename) {
             clearInterval(timer);
-            li.classList.add('rag-processed');
-            li.removeChild(ragElement);
-            const processedTag = document.createElement('span');
-            processedTag.textContent = ' (已 RAG 處理)';
-            processedTag.style.color = 'green';
-            li.appendChild(processedTag);
-            console.log('RAG 處理完成:', filename);
+            if (data.is_complete) {
+              li.classList.add('rag-processed');
+              li.removeChild(ragElement);
+              const processedTag = document.createElement('span');
+              processedTag.textContent = ' (已 RAG 處理)';
+              processedTag.style.color = 'green';
+              li.appendChild(processedTag);
+              console.log('RAG 處理完成:', filename);
+
+              // 顯示縮圖
+              const screenshotResponse = await fetch('/screenshot', {
+                method: 'POST',
+                body: new FormData().append('file_path', filename),
+              });
+              if (screenshotResponse.ok) {
+                const screenshotData = await screenshotResponse.json();
+                screenshotContainer.innerHTML = '';
+                screenshotFilename.textContent = filename;
+                screenshotData.thumbnails.forEach(thumb => {
+                  const img = document.createElement('img');
+                  img.src = thumb;
+                  img.alt = `Page of ${filename}`;
+                  img.style.display = 'block';
+                  screenshotContainer.appendChild(img);
+                });
+              } else {
+                console.error('無法獲取縮圖:', screenshotResponse.statusText);
+                alert('無法顯示縮圖，請稍後再試');
+              }
+            } else if (data.error) {
+              console.error('RAG 處理失敗:', data.error);
+              alert(`RAG 處理失敗: ${data.error}`);
+              ragElement.textContent = 'RAG 處理';
+              ragElement.disabled = false;
+            }
             ws.close();
           }
         };
         ws.onerror = (error) => {
           clearInterval(timer);
           console.error('WebSocket 錯誤:', error);
-          alert('RAG 狀態監控失敗');
+          alert('RAG 狀態監控失敗，請稍後重試');
           ragElement.textContent = 'RAG 處理';
           ragElement.disabled = false;
         };
@@ -208,8 +225,8 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
         };
       } catch (error) {
         clearInterval(timer);
-        console.error('RAG 處理錯誤:', error);
-        alert('RAG 處理發生異常，請查看控制台');
+        console.error('RAG 處理錯誤:', error.message);
+        alert('RAG 處理發生異常: ' + error.message);
         ragElement.textContent = 'RAG 處理';
         ragElement.disabled = false;
       }
@@ -240,6 +257,7 @@ async function loadFileList(fileList, screenshotContainer, screenshotFilename) {
     data.files.forEach(fileData => addFileToList(fileData, fileList, screenshotContainer, screenshotFilename));
   } catch (error) {
     console.error('獲取檔案列表時出錯:', error);
+    alert('無法載入檔案列表: ' + error.message);
   }
 }
 
@@ -273,12 +291,13 @@ document.addEventListener('DOMContentLoaded', () => {
           body: formData,
         });
         if (!response.ok) {
-          throw new Error('Upload failed');
+          throw new Error('上傳失敗');
         }
         const data = await response.json();
         addFileToList({ filename: data.filename, is_rag_processed: data.is_rag_processed }, fileList, screenshotContainer, screenshotFilename);
       } catch (error) {
-        console.error('Error uploading file:', error);
+        console.error('檔案上傳錯誤:', error);
+        alert('檔案上傳失敗: ' + error.message);
       }
     }
   });

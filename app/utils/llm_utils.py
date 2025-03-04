@@ -5,12 +5,18 @@
 
 import os
 import asyncio
+import time
+import logging
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain.globals import set_llm_cache
 from langchain_community.cache import InMemoryCache
 from utils.redis_utils import get_redis_history_chat, update_redis_history_chat
+
+# 設置日誌
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 os.environ["OPENAI_API_KEY"] = 'OPENAI_API_KEY'
 os.environ['TAVILY_API_KEY'] = 'TAVILY_API_KEY
@@ -45,7 +51,9 @@ async def llm_invoke(mode: str, user_id: str, question: str) -> str:
     Returns:
         str: LLM 生成的回應。
     """
+    logger.info(f"調用 llm_invoke: mode={mode}, user_id={user_id}, question={question}")
     messages = await get_redis_history_chat(user_id)
+    #logger.info(f"獲取歷史訊息: {messages}")
 
     base_instruction = """
         你是一位負責處理使用者問題的助手，具備廣泛的知識和專業能力。
@@ -101,6 +109,7 @@ async def llm_invoke(mode: str, user_id: str, question: str) -> str:
     prompt = ChatPromptTemplate.from_messages(messages)
     llm_chain = prompt | LLM | STR_PARSER
     response = await llm_chain.ainvoke({'question': question})  # 使用異步版本 ainvoke
+    #logger.info(f"llm_invoke 回應: {response}")
 
     await update_redis_history_chat(user_id, question, response)
     

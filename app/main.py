@@ -22,6 +22,7 @@ from utils.line_bot_handler import handle_line_ask_message, handle_line_assistan
 from utils.redis_utils import init_redis_pool, close_redis_pool
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 生命週期事件處理器
 @asynccontextmanager
@@ -229,46 +230,44 @@ async def rag_files(request: Request, background_tasks: BackgroundTasks) -> JSON
     base_filename = Path(filename).stem
     output_subfolder = OUTPUT_FOLDER / base_filename
     
-    logging.info(f"當前工作目錄: {Path.cwd()}")
-    logging.info(f"嘗試處理檔案: {file_location}")
-    
     if not file_location.exists():
         logging.error(f"檔案不存在: {file_location}")
         return JSONResponse({"error": f"檔案不存在: {file_location}"}, status_code=404)
     
-    logging.info(f"生成截圖: {file_location}")
-    thumbnails = []
-    if file_location.suffix.lower() == '.pdf':
-        existing_thumbnails = get_existing_thumbnails(filename, str(output_subfolder))
-        if existing_thumbnails:
-            thumbnails = existing_thumbnails
-        else:
-            thumbnails = generate_pdf_thumbnails(str(file_location), str(output_subfolder))
-    else:
-        thumbnails = [f"/uploads/{filename}"]
-    
     rag_status[filename] = False
-    background_tasks.add_task(rag_process, str(file_location), str(output_subfolder), filename)
+    background_tasks.add_task(process_rag_with_thumbnails, file_location, output_subfolder, filename)
     
     logging.info(f"RAG 處理已啟動: {file_location}")
     return JSONResponse({
         "message": "RAG 處理已啟動",
-        "thumbnails": thumbnails
+        "thumbnails": []
     })
 
-async def rag_process(file_location: str, output_folder: str, filename: str):
+async def process_rag_with_thumbnails(file_location: str, output_folder: str, filename: str):
     try:
+        thumbnails = []
+        if Path(file_location).suffix.lower() == '.pdf':
+            existing_thumbnails = get_existing_thumbnails(filename, output_folder)
+            if existing_thumbnails:
+                thumbnails = existing_thumbnails
+            else:
+                thumbnails = generate_pdf_thumbnails(file_location, output_folder)
+        else:
+            thumbnails = [f"/uploads/{filename}"]
+        logging.info(f"截圖生成完成: {thumbnails}")
+
         result = docling_extract_text_from_file(file_location, output_folder)
         if result.startswith("錯誤:"):
             logging.error(f"RAG 處理失敗: {result}")
-        else:
-            logging.info(f"RAG 處理完成: {file_location}")
-            rag_status[filename] = True
-            await manager.send_status(filename, True)
+            await manager.send_status(filename, False)  # 通知前端失敗
+            return
+        logging.info(f"RAG 處理完成: {file_location}")
+        rag_status[filename] = True
+        await manager.send_status(filename, True)
     except Exception as e:
         logging.error(f"RAG 處理異常: {str(e)}", exc_info=True)
-    finally:
-        rag_status[filename] = True
+        rag_status[filename] = False
+        await manager.send_status(filename, False)  # 通知前端失敗
 
 @app.websocket("/ws/rag-status/{filename}")
 async def websocket_rag_status(websocket: WebSocket, filename: str):
@@ -276,64 +275,50 @@ async def websocket_rag_status(websocket: WebSocket, filename: str):
     try:
         while True:
             await asyncio.sleep(1)
-            if filename in rag_status and rag_status[filename]:
-                await manager.send_status(filename, True)
-                break
+            if filename in rag_status:
+                await manager.send_status(filename, rag_status[filename])
+                if rag_status[filename]:  # 僅在成功完成時斷開
+                    break
     except WebSocketDisconnect:
         await manager.disconnect(filename)
     except Exception as e:
         logging.error(f"WebSocket 錯誤: {str(e)}")
+        await websocket.send_json({"filename": filename, "is_complete": False, "error": str(e)})
     finally:
         await manager.disconnect(filename)
 
 # LINE-BOT 路由
 @app.post("/ask")
-async def call_ask(request: Request, x_line_signature: str = Header(None)) -> str:
-    """處理 Line Bot 的問答請求。
-
-    Args:
-        request (Request): FastAPI 請求對象。
-        x_line_signature (str): Line 的簽名頭部。
-
-    Returns:
-        str: "OK" 表示成功處理。
-    """
-    signature = x_line_signature
+async def call_ask(request: Request):
+    """處理 Line Bot 的問答請求。"""
     body = await request.body()
-    body_str = body.decode('utf-8')
-    print("Request body:", body_str)
+    signature = request.headers.get('X-Line-Signature', '')
     try:
-        handle_line_ask_message(body_str, signature)
-    except HTTPException as error:
-        raise error
-    except Exception as error:
-        print(f"Error handling Line message: {error}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-    return "OK"
+        await handle_line_ask_message(body.decode('utf-8'), signature)
+        logger.info(f"/ask 請求處理成功")
+        return {"status": "ok"}
+    except HTTPException as e:
+        logger.error(f"/ask 請求發生 HTTP 錯誤: {str(e)}")
+        raise e
+    except Exception as e:
+        logger.error(f"處理 /ask 路由時發生錯誤: {str(e)}", exc_info=True)  # 記錄完整堆棧
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
 @app.post("/assistant")
-async def call_assistant(request: Request, x_line_signature: str = Header(None)) -> str:
-    """處理 Line Bot 的助理請求。
-
-    Args:
-        request (Request): FastAPI 請求對象。
-        x_line_signature (str): Line 的簽名頭部。
-
-    Returns:
-        str: "OK" 表示成功處理。
-    """
-    signature = x_line_signature
+async def call_assistant(request: Request):
+    """處理 Line Bot 的助理請求。"""
     body = await request.body()
-    body_str = body.decode('utf-8')
-    print("Request body:", body_str)
+    signature = request.headers.get('X-Line-Signature', '')
     try:
-        handle_line_assistant_message(body_str, signature)
-    except HTTPException as error:
-        raise error
-    except Exception as error:
-        print(f"Error handling Line assistant message: {error}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-    return "OK"
+        await handle_line_assistant_message(body.decode('utf-8'), signature)
+        logger.info(f"/assistant 請求處理成功")
+        return {"status": "ok"}
+    except HTTPException as e:
+        logger.error(f"/assistant 請求發生 HTTP 錯誤: {str(e)}")
+        raise e
+    except Exception as e:
+        logger.error(f"處理 /assistant 路由時發生錯誤: {str(e)}", exc_info=True)  # 記錄完整堆棧
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") from e
 
 if __name__ == "__main__":
     import uvicorn
