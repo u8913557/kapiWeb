@@ -166,7 +166,7 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
         screenshotFilename.textContent = filename;
 
         // 建立 WebSocket 連線
-        const ws = new WebSocket(`ws://${window.location.host}/ws/rag-status/${filename}`);
+        const ws = new WebSocket(`wss://${window.location.host}/ws/rag-status/${filename}`);
         ws.onopen = () => {
           console.log('WebSocket 連線建立:', filename);
         };

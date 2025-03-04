@@ -124,9 +124,7 @@ async def upload_file(file: UploadFile = File(...)) -> JSONResponse:
     base_filename = Path(file.filename).stem
     output_subfolder = OUTPUT_FOLDER / base_filename
     txt_exists = (output_subfolder / f"{base_filename}_full_text.txt").exists()
-    md_exists = (output_subfolder / f"{base_filename}_full_text.md").exists()
-    doctags_exists = (output_subfolder / f"{base_filename}_full_text.doctags").exists()
-    is_rag_processed = txt_exists and md_exists and doctags_exists
+    is_rag_processed = txt_exists
     
     return JSONResponse(content={
         "message": "File uploaded successfully",
@@ -177,9 +175,7 @@ async def get_uploaded_files() -> JSONResponse:
                 base_filename = f.stem
                 output_subfolder = OUTPUT_FOLDER / base_filename
                 txt_exists = (output_subfolder / f"{base_filename}_full_text.txt").exists()
-                md_exists = (output_subfolder / f"{base_filename}_full_text.md").exists()
-                doctags_exists = (output_subfolder / f"{base_filename}_full_text.doctags").exists()
-                is_rag_processed = txt_exists and md_exists and doctags_exists
+                is_rag_processed = txt_exists
                 files.append({
                     "filename": f.name,
                     "is_rag_processed": is_rag_processed
@@ -262,7 +258,8 @@ async def process_rag_with_thumbnails(file_location: str, output_folder: str, fi
             thumbnails = [f"/uploads/{filename}"]
         logging.info(f"截圖生成完成: {thumbnails}")
 
-        result = docling_extract_text_from_file(file_location, output_folder)
+        #result = docling_extract_text_from_file(file_location, output_folder)
+        result = extract_text_from_file(file_location, output_folder)
         if isinstance(result, list) and len(result) > 0 and result[0].startswith("錯誤:"):
             logging.error(f"RAG 處理失敗: {result[0]}")
             await manager.send_status(filename, False)  # 通知前端失敗
