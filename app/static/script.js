@@ -173,7 +173,7 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
         ws.onmessage = async (event) => {
           const data = JSON.parse(event.data);
           console.log('WebSocket 收到訊息:', data);
-          if (data.filename === filename) {
+          if (data.filename && data.filename === filename) {  // 確保 filename 存在
             clearInterval(timer);
             if (data.is_complete) {
               li.classList.add('rag-processed');
@@ -183,11 +183,19 @@ function addFileToList(fileData, fileList, screenshotContainer, screenshotFilena
               processedTag.style.color = 'green';
               li.appendChild(processedTag);
               console.log('RAG 處理完成:', filename);
-
+        
               // 顯示縮圖
+              if (!filename) {
+                console.error('文件名無效，無法請求截圖');
+                alert('文件名無效，請檢查檔案列表');
+                return;
+              }
+        
+              const formData = new FormData();
+              formData.append('file_path', filename);
               const screenshotResponse = await fetch('/screenshot', {
                 method: 'POST',
-                body: new FormData().append('file_path', filename),
+                body: formData,
               });
               if (screenshotResponse.ok) {
                 const screenshotData = await screenshotResponse.json();

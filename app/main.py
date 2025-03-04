@@ -201,10 +201,16 @@ async def screenshot_files(request: Request) -> JSONResponse:
     """
     form_data = await request.form()
     filename = form_data.get('file_path')
+
+    if not filename or filename is None:
+        logging.error("未提供文件名或文件名為 None")
+        return JSONResponse(content={"error": "未提供有效的文件名"}, status_code=400)
+
     file_path = UPLOAD_FOLDER / filename
 
     if not file_path.exists():
-        return JSONResponse(content={"error": "檔案不存在"}, status_code=404)
+        logging.error(f"檔案不存在: {file_path}")
+        return JSONResponse(content={"error": f"檔案不存在: {file_path}"}, status_code=404)
 
     base_filename = Path(filename).stem
     output_subfolder = OUTPUT_FOLDER / base_filename

@@ -153,7 +153,7 @@ def docling_extract_text_from_file(file_location: str, output_folder: str) -> st
         if not input_doc_path.exists():
             raise FileNotFoundError(f"檔案不存在: {file_location}")
 
-        logging.info(f"處理檔案: {input_doc_path.absolute()}")
+        logging.info(f"開始處理檔案: {input_doc_path.absolute()}")
 
         # 定義 OCR 選項，支持英文和中文（繁體、簡體）
         ocr_options = EasyOcrOptions(lang=["en", "ch_tra"])
