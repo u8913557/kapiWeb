@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from utils.llm_utils import llm_invoke
-from utils.ocr_utils import generate_pdf_thumbnails, get_existing_thumbnails, docling_extract_text_from_file
+from utils.ocr_utils import generate_pdf_thumbnails, get_existing_thumbnails, docling_extract_text_from_file, extract_text_from_file
 from utils.line_bot_handler import handle_line_ask_message, handle_line_assistant_message
 from utils.redis_utils import init_redis_pool, close_redis_pool
 
@@ -263,10 +263,11 @@ async def process_rag_with_thumbnails(file_location: str, output_folder: str, fi
         logging.info(f"截圖生成完成: {thumbnails}")
 
         result = docling_extract_text_from_file(file_location, output_folder)
-        if result.startswith("錯誤:"):
-            logging.error(f"RAG 處理失敗: {result}")
+        if isinstance(result, list) and len(result) > 0 and result[0].startswith("錯誤:"):
+            logging.error(f"RAG 處理失敗: {result[0]}")
             await manager.send_status(filename, False)  # 通知前端失敗
             return
+        # 正常情況，result 是一個文字列表，處理成功
         logging.info(f"RAG 處理完成: {file_location}")
         rag_status[filename] = True
         await manager.send_status(filename, True)
